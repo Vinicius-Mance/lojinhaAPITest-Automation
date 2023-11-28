@@ -2,13 +2,12 @@ package modulos.produto;
 
 
 import dataFactory.ProdutoDataFactory;
+import dataFactory.UsuarioDataFactory;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import pojo.ComponentePojo;
 import pojo.ProdutoPojo;
-import pojo.UsuarioPojo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +20,7 @@ public class ProdutoTest {
 
     private String token;
     private ProdutoPojo produto;
+
     @BeforeEach
     public void beforeEach() {
 //                configuração dos dados da lojinha
@@ -28,16 +28,13 @@ public class ProdutoTest {
 //            port = 8080;
         basePath = "/lojinha";
 
-        UsuarioPojo usuario = new UsuarioPojo("vinny","senha123");
-//        obter token do usuario
-
 
         this.token = given()
                 .contentType(ContentType.JSON)
-                .body(usuario)
-                .when()
+                .body(UsuarioDataFactory.criarUsuario())
+            .when()
                 .post("/v2/login")
-                .then()
+            .then()
                 .extract()
                 .path("data.token");
 
@@ -49,22 +46,31 @@ public class ProdutoTest {
     @Test
     @DisplayName("Validar limites proibidos do valor do produto ->")
     public void testValidarLimitesProibidosValorProduto() {
-        
-//        alterando produto para que tenha valor inválido
-        this.produto.setProdutoValor(0.00);
 
-//        Tentar inserir um produto com valor 0.00 e validar que um erro foi apresentado
-//        status code retornado: 422
-        given()
-                .contentType(ContentType.JSON)
-                .header("token",this.token)
-                .body(this.produto)
-            .when()
-                .post("/v2/produtos")
-            .then()
-                .assertThat()
+//        lista com todos os valores inválidos de um produto
+        List<Double> valoresInvalidos = new ArrayList<>();
+
+        valoresInvalidos.add(-0.01);
+        valoresInvalidos.add(0.00);
+        valoresInvalidos.add(7000.01);
+
+        for (double valor : valoresInvalidos) {
+            this.produto.setProdutoValor(valor);
+//      Tentar inserir um produto com valores incorretos e retornar erro
+//      status code retornado: 422
+            given()
+                    .contentType(ContentType.JSON)
+                    .header("token",this.token)
+                    .body(this.produto)
+                .when()
+                    .post("/v2/produtos")
+                .then()
+                    .assertThat()
                     .body("error", equalTo("O valor do produto deve estar entre R$ 0,01 e R$ 7.000,00"))
                     .statusCode(422);
+        }
+
+
     }
 
 }
